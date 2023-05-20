@@ -349,6 +349,7 @@ type System struct {
 	luaLState         *lua.LState
 	statusLFunc       *lua.LFunction
 	listLFunc         []*lua.LFunction
+	exhibition        bool
 	introSkipped      bool
 	endMatch          bool
 	continueFlg       bool
@@ -1508,7 +1509,15 @@ func (s *System) draw(x, y, scl float32) {
 		//	fade(rect, 0, 255)
 		//}
 		s.lifebar.draw(-1)
-		s.lifebar.draw(0)
+		if s.exhibition || s.lifebar.ro.match_waittime == 0 {
+			s.lifebar.draw(0)
+		} else {
+			for ti := range sys.tmode {
+				for i, v := range s.lifebar.order[ti] {
+					s.lifebar.nm[s.lifebar.ref[ti]][i*2+ti].draw2(0, v, s.lifebar.fnt[:], ti)
+				}
+			}
+		}
 	} else {
 		FillRect(s.scrrect, ecol, 255)
 	}

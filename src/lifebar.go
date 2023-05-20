@@ -1174,6 +1174,22 @@ func (nm *LifeBarName) reset() {
 func (nm *LifeBarName) bgDraw(layerno int16) {
 	nm.bg.Draw(float32(nm.pos[0])+sys.lifebarOffsetX, float32(nm.pos[1]), layerno, sys.lifebarScale)
 }
+
+func (nm *LifeBarName) draw2(layerno int16, ref int, f []*Fnt, side int) {
+	if nm.name.font[0] >= 0 && int(nm.name.font[0]) < len(f) && f[nm.name.font[0]] != nil {
+
+		var x = float32(nm.pos[0]) + (sys.lifebarOffsetX)
+		var y = float32(nm.pos[1])
+		if side == 1 {
+			x += sys.lifebarOffsetX * 1.9
+		} else {
+			x -= 60
+		}
+
+		nm.name.lay.DrawText(x, y, sys.lifebarScale*1.6, layerno,
+			sys.cgi[ref].lifebarname, f[nm.name.font[0]], nm.name.font[1], nm.name.font[2], nm.name.palfx, nm.name.frgba)
+	}
+}
 func (nm *LifeBarName) draw(layerno int16, ref int, f []*Fnt, side int) {
 	if nm.name.font[0] >= 0 && int(nm.name.font[0]) < len(f) && f[nm.name.font[0]] != nil {
 		nm.name.lay.DrawText((float32(nm.pos[0]) + sys.lifebarOffsetX), float32(nm.pos[1]), sys.lifebarScale, layerno,
@@ -1689,6 +1705,7 @@ type LifeBarRound struct {
 	pos                [2]int32
 	match_wins         [2]int32
 	match_maxdrawgames [2]int32
+	match_waittime     int32
 	start_waittime     int32
 	round_time         int32
 	round_sndtime      int32
@@ -1748,7 +1765,7 @@ type LifeBarRound struct {
 
 func newLifeBarRound(snd *Snd) *LifeBarRound {
 	return &LifeBarRound{snd: snd, match_wins: [...]int32{2, 2},
-		match_maxdrawgames: [...]int32{1, 1}, start_waittime: 30, ctrl_time: 30,
+		match_maxdrawgames: [...]int32{1, 1}, match_waittime: 0, start_waittime: 30, ctrl_time: 30,
 		slow_time: 60, slow_fadetime: 45, slow_speed: 0.25, over_waittime: 45,
 		over_hittime: 10, over_wintime: 45, over_time: 210, fadein_time: 30,
 		fadeout_time: 30, shutter_time: 15, callfight_time: 60}
@@ -1761,6 +1778,9 @@ func readLifeBarRound(is IniSection,
 	is.ReadI32("pos", &ro.pos[0], &ro.pos[1])
 	is.ReadI32("match.wins", &ro.match_wins[0], &ro.match_wins[1])
 	is.ReadI32("match.maxdrawgames", &ro.match_maxdrawgames[0], &ro.match_maxdrawgames[1])
+	if is.ReadI32("match.waittime", &tmp) {
+		ro.match_waittime = Max(0, tmp)
+	}
 	if is.ReadI32("start.waittime", &tmp) {
 		ro.start_waittime = Max(1, tmp)
 	}
@@ -2081,10 +2101,14 @@ func (ro *LifeBarRound) act() bool {
 			}
 			if !ro.introState[0] {
 				roundNum := sys.round
+				if sys.round == 1 && !sys.exhibition && ro.match_waittime != 0 {
+					ro.wt[1] = ro.match_waittime //=================================================================================
+				}
+
 				if sys.consecutiveRounds {
 					roundNum = sys.consecutiveWins[0] + 1
 				}
-				if ro.swt[0] == 0 {
+				if ro.swt[0] == 0 && (sys.exhibition || ro.match_waittime == 0) {
 					if !sys.consecutiveRounds && sys.roundType[0] == RT_Final && ro.round_final.snd[0] != -1 {
 						ro.snd.play(ro.round_final.snd, 100, 0)
 					} else if int(roundNum) <= len(ro.round) && ro.round[roundNum-1].snd[0] != -1 {
@@ -2135,7 +2159,26 @@ func (ro *LifeBarRound) act() bool {
 			}
 			if ro.cur == 0 {
 				if ro.wt[1] == 0 {
-					ro.callFight()
+					if sys.exhibition || ro.match_waittime == 0 {
+						ro.callFight()
+					} else {
+						sys.reloadFlg = true
+						for i := range sys.reloadCharSlot {
+							sys.reloadCharSlot[i] = true
+						}
+						sys.reloadStageFlg = true
+						sys.reloadLifebarFlg = true
+
+						sys.exhibition = true
+						ro.wt[1] = ro.callfight_time
+
+						sys.intro = -1
+						ro.introState[0] = false
+						ro.introState[1] = false
+						sys.dialogueFlg = false
+
+						sys.roundResetFlg = true
+					}
 				}
 				ro.wt[1]--
 			} else if !ro.introState[1] {
@@ -2354,7 +2397,7 @@ func (ro *LifeBarRound) reset() {
 func (ro *LifeBarRound) draw(layerno int16, f []*Fnt) {
 	ob := sys.brightness
 	sys.brightness = 256
-	if !ro.introState[0] && ro.wt[0] < 0 && sys.intro <= ro.ctrl_time {
+	if !ro.introState[0] && ro.wt[0] < 0 && sys.intro <= ro.ctrl_time && (sys.exhibition || ro.match_waittime == 0) {
 		for i := range ro.round_default_bg {
 			ro.round_default_bg[i].Draw(float32(ro.pos[0])+sys.lifebarOffsetX, float32(ro.pos[1]), layerno, sys.lifebarScale)
 		}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	lua "github.com/yuin/gopher-lua"
 	"math"
 	"math/rand"
 	"os"
@@ -10,8 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	lua "github.com/yuin/gopher-lua"
 )
 
 // Data handlers
@@ -1048,7 +1047,19 @@ func systemScriptInit(l *lua.LState) {
 				sys.sel.cdefOverwrite = make(map[int]string)
 				sys.sel.sdefOverwrite = ""
 				l.Push(lua.LNumber(winp))
-				l.Push(tbl)
+
+				var retornoJSON = "{\n"
+
+				if sys.wins[0] > sys.wins[1] {
+					retornoJSON += "\"vencedor\": 1"
+					retornoJSON += ",\n\"char\": \"" + sys.chars[0][0].gi().displayname + "\""
+				} else {
+					retornoJSON += "\"vencedor\": 2"
+					retornoJSON += ",\n\"char\": \"" + sys.chars[1][0].gi().displayname + "\""
+				}
+
+				retornoJSON += "\n}"
+				l.Push(lua.LString(retornoJSON))
 				if sys.playBgmFlg {
 					sys.bgm = *newBgm()
 					sys.playBgmFlg = false
@@ -1631,6 +1642,7 @@ func systemScriptInit(l *lua.LState) {
 		}
 		sys.reloadStageFlg = true
 		sys.reloadLifebarFlg = true
+		sys.exhibition = true
 		return 0
 	})
 	luaRegister(l, "remapInput", func(l *lua.LState) int {
@@ -1696,6 +1708,7 @@ func systemScriptInit(l *lua.LState) {
 	})
 	luaRegister(l, "roundReset", func(*lua.LState) int {
 		sys.roundResetFlg = true
+		sys.exhibition = true
 		return 0
 	})
 	luaRegister(l, "screenshot", func(*lua.LState) int {

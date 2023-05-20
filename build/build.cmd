@@ -18,4 +18,6 @@ echo.
 
 go build -trimpath -v -ldflags -H=windowsgui -o ./bin/Ikemen_GO.exe ./src
 
-pause
+REM msg /server:localhost * terminou
+
+cd build 
